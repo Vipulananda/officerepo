@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'vipulv25/simple-docker-app'         // Docker Hub image name
+        CONTAINER_NAME = 'simple-app-container'           // Name of the running container
+    }
+
+    stages {
+        stage('Pull Code') {
+            steps {
+                git 'https://github.com/Vipulananda/officerepo.git' // Updated GitHub repo URL
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t $IMAGE_NAME .'
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push $IMAGE_NAME'
+                }
+            }
+        }
+
+        stage('Deploy App (Run Docker Container)') {
+            steps {
+                script {
+                    // Stop and remove old container if running
+                    sh "docker stop $CONTAINER_NAME || true"
+                    sh "docker rm $CONTAINER_NAME || true"
+
+                    // Run the new container
+                    sh "docker run -d --name $CONTAINER_NAME -p 80:3000 $IMAGE_NAME"
+                }
+            }
+        }
+    }
+}
